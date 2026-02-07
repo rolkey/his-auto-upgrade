@@ -1,0 +1,23 @@
+{
+  "name": "upgrade-frontend",
+  "version": "1.0.0",
+  "description": "Vue3升级管理前端",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "axios": "^1.13.4",
+    "element-plus": "^2.13.2",
+    "pinia": "^2.0.0",
+    "vue": "^3.2.0",
+    "vue-router": "^4.0.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^4.0.0",
+    "@vue/compiler-sfc": "^3.2.0",
+    "sass": "^1.55.0",
+    "vite": "^4.0.0"
+  }
+}

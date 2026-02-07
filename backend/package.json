@@ -1,0 +1,41 @@
+{
+  "name": "upgrade-backend",
+  "version": "1.0.0",
+  "description": "NestJS升级管理后端",
+  "main": "dist/main.js",
+  "scripts": {
+    "build": "nest build",
+    "start": "node dist/main.js",
+    "start:dev": "nest start --watch",
+    "start:debug": "nest start --debug --watch",
+    "start:prod": "node dist/main.js",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:cov": "jest --coverage",
+    "lint": "eslint \"src/**/*.ts\" --fix",
+    "format": "prettier --write \"src/**/*.ts\""
+  },
+  "dependencies": {
+    "@nestjs/common": "^9.4.3",
+    "@nestjs/core": "^9.4.3",
+    "@nestjs/platform-express": "^9.0.0",
+    "@octokit/rest": "^19.0.13",
+    "fs-extra": "^11.3.3",
+    "reflect-metadata": "^0.1.13",
+    "rxjs": "^7.0.0"
+  },
+  "devDependencies": {
+    "@nestjs/cli": "^9.0.0",
+    "@nestjs/testing": "^9.0.0",
+    "@types/fs-extra": "^11.0.0",
+    "@types/jest": "^28.0.0",
+    "@types/node": "^18.0.0",
+    "@typescript-eslint/eslint-plugin": "^5.0.0",
+    "@typescript-eslint/parser": "^5.0.0",
+    "eslint": "^8.0.0",
+    "jest": "^28.0.0",
+    "prettier": "^2.7.0",
+    "ts-jest": "^28.0.0",
+    "typescript": "^4.7.0"
+  }
+}

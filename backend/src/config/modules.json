@@ -1,0 +1,23 @@
+[
+    {
+        "name": "microfrontend-admin",
+        "repo": "your-org/admin-app",
+        "type": "microfrontend",
+        "deployPath": "/var/www/deployments/microfrontends/admin",
+        "buildCommand": "npm run build",
+        "branch": "main",
+        "env": {
+            "NODE_ENV": "production"
+        }
+    },
+    {
+        "name": "auth-service",
+        "repo": "your-org/auth-service",
+        "type": "backend",
+        "deployPath": "/var/www/deployments/services/auth",
+        "buildCommand": "npm run build:prod",
+        "branch": "release",
+        "beforeBuild": "npm run generate-types",
+        "afterDeploy": "pm2 restart auth-service"
+    }
+]
