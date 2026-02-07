@@ -1,22 +1,22 @@
-import { Injectable, Logger } from "@nestjs/common";
-import { exec } from "child_process";
-import { promisify } from "util";
-import * as fs from "fs-extra";
-import * as path from "path";
-import * as modulesConfig from "../config/modules.json";
+import { Injectable, Logger } from '@nestjs/common';
+import { exec } from 'child_process';
+import { promisify } from 'util';
+import { promises as fs, constants, existsSync } from 'node:fs';
+import * as path from 'node:path';
+import * as modulesConfig from '../config/modules.json';
 
 const execAsync = promisify(exec);
 
-interface ModuleConfig {
+export interface ModuleConfig {
   name: string;
   repo: string; // GitHub仓库地址，格式：owner/repo
-  type: "frontend" | "backend" | "microfrontend";
+  type: 'frontend' | 'backend' | 'microfrontend';
   deployPath: string; // 部署目标路径
   buildCommand: string; // 构建命令，默认 'npm run build'
   branch?: string; // 分支，默认 'main'
 }
 
-interface UpgradeResult {
+export interface UpgradeResult {
   success: boolean;
   module: string;
   message: string;
@@ -24,12 +24,27 @@ interface UpgradeResult {
   version?: string;
 }
 
+export interface ModuleStatus {
+  name: string;
+  type: 'frontend' | 'backend' | 'microfrontend';
+  currentVersion: string;
+  latestVersion: string;
+  deployPath: string;
+  status: 'up-to-date' | 'outdated';
+  lastUpdated: string | null;
+}
+
+export interface PackageJson {
+  version?: string;
+  [key: string]: any;
+}
+
 @Injectable()
 export class UpgradeService {
   private readonly logger = new Logger(UpgradeService.name);
+  private readonly modules = modulesConfig as ModuleConfig[];
 
-  // 模块配置
-  constructor(private readonly modules: ModuleConfig[] = modulesConfig as ModuleConfig[]) {}
+  constructor() {}
 
   /**
    * 升级单个模块
@@ -45,14 +60,14 @@ export class UpgradeService {
       };
     }
 
-    const tempDir = path.join("/tmp/upgrade", moduleName);
+    const tempDir = path.join('/tmp/upgrade', moduleName);
     const startTime = Date.now();
 
     try {
       this.logger.log(`开始升级模块: ${moduleName}`);
 
       // 1. 创建临时目录
-      await fs.ensureDir(tempDir);
+      await fs.mkdir(tempDir, { recursive: true });
 
       // 2. 克隆或拉取代码
       await this.gitCloneOrPull(module, tempDir);
@@ -84,7 +99,6 @@ export class UpgradeService {
       };
     } catch (error) {
       this.logger.error(`模块 ${moduleName} 升级失败:`, error);
-
       throw error;
     } finally {
       // 清理临时目录
@@ -113,8 +127,8 @@ export class UpgradeService {
   /**
    * 获取所有模块状态
    */
-  async getModulesStatus() {
-    const statusList = [];
+  async getModulesStatus(): Promise<ModuleStatus[]> {
+    const statusList: ModuleStatus[] = [];
 
     for (const module of this.modules) {
       try {
@@ -127,11 +141,11 @@ export class UpgradeService {
           currentVersion,
           latestVersion,
           deployPath: module.deployPath,
-          status: currentVersion === latestVersion ? "up-to-date" : "outdated",
+          status: currentVersion === latestVersion ? 'up-to-date' : 'outdated',
           lastUpdated: await this.getLastModifiedTime(module.deployPath),
         });
       } catch (error) {
-        console.error("getModulesStatus", error);
+        console.error('getModulesStatus', error);
         throw error;
       }
     }
@@ -144,11 +158,11 @@ export class UpgradeService {
    */
   private async gitCloneOrPull(module: ModuleConfig, targetDir: string): Promise<void> {
     const repoUrl = `https://github.com/${module.repo}.git`;
-    const branch = module.branch || "main";
+    const branch = module.branch || 'main';
 
-    const gitDir = path.join(targetDir, ".git");
+    const gitDir = path.join(targetDir, '.git');
 
-    if (await fs.pathExists(gitDir)) {
+    if (existsSync(gitDir)) {
       // 如果已有git仓库，拉取最新
       await execAsync(
         `cd ${targetDir} && git fetch origin && git checkout ${branch} && git pull origin ${branch}`,
@@ -163,10 +177,13 @@ export class UpgradeService {
    * 安装npm依赖
    */
   private async npmInstall(dir: string): Promise<void> {
-    const packageJson = path.join(dir, "package.json");
+    const packageJson = path.join(dir, 'package.json');
 
-    if (await fs.pathExists(packageJson)) {
+    try {
+      await fs.access(packageJson, constants.F_OK);
       await execAsync(`cd ${dir} && npm ci --no-audit --no-fund`);
+    } catch {
+      // package.json 不存在，跳过安装
     }
   }
 
@@ -174,20 +191,26 @@ export class UpgradeService {
    * 构建项目
    */
   private async buildProject(dir: string, buildCommand: string): Promise<void> {
-    await execAsync(`cd ${dir} && ${buildCommand}`, { maxBuffer: 1024 * 1024 * 10 });
+    await execAsync(`cd ${dir} && ${buildCommand}`, {
+      maxBuffer: 1024 * 1024 * 10,
+    });
   }
 
   /**
    * 备份当前部署
    */
   private async backupCurrent(deployPath: string, moduleName: string): Promise<void> {
-    if (await fs.pathExists(deployPath)) {
+    try {
+      await fs.access(deployPath, constants.F_OK);
       const backupDir = path.join(
-        "/var/www/backups",
+        '/var/www/backups',
         moduleName,
-        new Date().toISOString().replace(/:/g, "-"),
+        new Date().toISOString().replace(/:/g, '-'),
       );
-      await fs.copy(deployPath, backupDir);
+      await fs.mkdir(path.dirname(backupDir), { recursive: true });
+      await fs.cp(deployPath, backupDir, { recursive: true });
+    } catch {
+      // deployPath 不存在，跳过备份
     }
   }
 
@@ -197,40 +220,52 @@ export class UpgradeService {
   private async deployBuild(
     sourceDir: string,
     targetDir: string,
-    type: "frontend" | "backend" | "microfrontend",
+    type: 'frontend' | 'backend' | 'microfrontend',
   ): Promise<void> {
     // 查找构建输出目录
-    let buildOutput = "";
+    let buildOutput = '';
 
-    if (type === "frontend" || type === "microfrontend") {
+    if (type === 'frontend' || type === 'microfrontend') {
       // 前端项目通常输出到 dist 或 build 目录
-      const possibleDirs = ["dist", "build", "out", "public"];
+      const possibleDirs = ['dist', 'build', 'out', 'public'];
       for (const dir of possibleDirs) {
         const testPath = path.join(sourceDir, dir);
-        if (await fs.pathExists(testPath)) {
+        try {
+          await fs.access(testPath, constants.F_OK);
           buildOutput = testPath;
           break;
+        } catch {
+          // 目录不存在，继续尝试下一个
         }
       }
     } else {
       // 后端项目可能输出到 dist 目录，也可能是整个项目
-      const distPath = path.join(sourceDir, "dist");
-      buildOutput = (await fs.pathExists(distPath)) ? distPath : sourceDir;
+      const distPath = path.join(sourceDir, 'dist');
+      try {
+        await fs.access(distPath, constants.F_OK);
+        buildOutput = distPath;
+      } catch {
+        buildOutput = sourceDir;
+      }
     }
 
     if (!buildOutput) {
-      throw new Error("未找到构建输出目录");
+      throw new Error('未找到构建输出目录');
     }
 
     // 清空目标目录（如果存在）
-    if (await fs.pathExists(targetDir)) {
-      await fs.emptyDir(targetDir);
-    } else {
-      await fs.ensureDir(targetDir);
+    try {
+      await fs.access(targetDir, constants.F_OK);
+      await fs.rm(targetDir, { recursive: true, force: true });
+    } catch {
+      // 目录不存在，继续创建
     }
 
+    // 创建目标目录
+    await fs.mkdir(targetDir, { recursive: true });
+
     // 复制构建产物
-    await fs.copy(buildOutput, targetDir);
+    await fs.cp(buildOutput, targetDir, { recursive: true });
   }
 
   /**
@@ -239,19 +274,20 @@ export class UpgradeService {
   private async getVersion(dir: string): Promise<string> {
     try {
       // 尝试从package.json获取
-      const packageJson = path.join(dir, "package.json");
-      if (await fs.pathExists(packageJson)) {
-        const pkg = await fs.readJson(packageJson);
-        return pkg.version || "unknown";
-      }
-
-      // 尝试从git获取
-      const { stdout } = await execAsync(
-        `cd ${dir} && git describe --tags --abbrev=0 || git rev-parse --short HEAD`,
-      );
-      return stdout.trim();
+      const packageJson = path.join(dir, 'package.json');
+      await fs.access(packageJson, constants.F_OK);
+      const pkg = JSON.parse(await fs.readFile(packageJson, 'utf-8')) as PackageJson;
+      return pkg.version || 'unknown';
     } catch {
-      return "unknown";
+      try {
+        // 尝试从git获取
+        const { stdout } = await execAsync(
+          `cd ${dir} && git describe --tags --abbrev=0 || git rev-parse --short HEAD`,
+        );
+        return stdout.trim();
+      } catch {
+        return 'unknown';
+      }
     }
   }
 
@@ -259,12 +295,14 @@ export class UpgradeService {
    * 获取当前部署版本
    */
   private async getCurrentVersion(deployPath: string): Promise<string> {
-    const packageJson = path.join(deployPath, "package.json");
-    if (await fs.pathExists(packageJson)) {
-      const pkg = await fs.readJson(packageJson);
-      return pkg.version || "unknown";
+    try {
+      const packageJson = path.join(deployPath, 'package.json');
+      await fs.access(packageJson, constants.F_OK);
+      const pkg = JSON.parse(await fs.readFile(packageJson, 'utf-8')) as PackageJson;
+      return pkg.version || 'unknown';
+    } catch {
+      return 'unknown';
     }
-    return "unknown";
   }
 
   /**
@@ -280,7 +318,7 @@ export class UpgradeService {
       if (stdout) {
         const match = stdout.match(/refs\/tags\/(.+)/);
         if (match && match[1]) {
-          return match[1].replace(/\^\{\}$/, "");
+          return match[1].replace(/\^\{\}$/, '');
         }
       }
 
@@ -288,9 +326,9 @@ export class UpgradeService {
       const { stdout: commitStdout } = await execAsync(
         `git ls-remote https://github.com/${repo}.git HEAD | cut -f1`,
       );
-      return commitStdout.trim().substring(0, 7) || "unknown";
+      return commitStdout.trim().substring(0, 7) || 'unknown';
     } catch {
-      return "unknown";
+      return 'unknown';
     }
   }
 
@@ -311,7 +349,7 @@ export class UpgradeService {
    */
   private async cleanupTemp(tempDir: string): Promise<void> {
     try {
-      await fs.remove(tempDir);
+      await fs.rm(tempDir, { recursive: true, force: true });
     } catch (error) {
       this.logger.warn(`清理临时目录失败: ${tempDir}`, error);
     }

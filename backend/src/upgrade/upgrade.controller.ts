@@ -1,20 +1,22 @@
-import { Controller, Get, Post, Body, Query } from "@nestjs/common";
-import { UpgradeService } from "./upgrade.service";
+import { Controller, Get, Post, Body, Query } from '@nestjs/common';
+import { ModuleStatus, UpgradeResult, UpgradeService } from './upgrade.service';
 
-@Controller("upgrade")
+@Controller('upgrade')
 export class UpgradeController {
   constructor(private readonly upgradeService: UpgradeService) {}
 
-  @Get("status")
-  async getStatus() {
+  @Get('status')
+  async getStatus(): Promise<{ timestamp: string; modules: ModuleStatus[] }> {
     return {
       timestamp: new Date().toISOString(),
       modules: await this.upgradeService.getModulesStatus(),
     };
   }
 
-  @Post("upgrade")
-  async upgrade(@Body() body: { module?: string; modules?: string[] }) {
+  @Post('upgrade')
+  async upgrade(
+    @Body() body: { module?: string; modules?: string[] },
+  ): Promise<UpgradeResult | UpgradeResult[]> {
     if (body.module) {
       return await this.upgradeService.upgradeModule(body.module);
     } else if (body.modules) {
@@ -24,8 +26,9 @@ export class UpgradeController {
     }
   }
 
-  @Get("log")
-  async getLog(@Query("module") module?: string) {
+  @Get('log')
+  getLog(@Query('module') module?: string) {
+    console.log(module);
     // 返回升级日志
     return {
       timestamp: new Date().toISOString(),

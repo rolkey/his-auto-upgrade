@@ -1,0 +1,20 @@
+{
+    "configurations": [
+        {
+            "type": "node",
+            "request": "launch",
+            "name": "升级模块",
+            "runtimeExecutable": "pnpm", // 或 "npm"、"yarn"
+            "runtimeArgs": [
+                "run",
+                "start:debug"
+            ], // 对应 package.json 中的脚本
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}", // 确保工作目录正确
+            "envFile": "${workspaceFolder}/.env", // 设置环境变量文件路径
+            "env": {
+                "TZ": "Asia/Shanghai" // 设置时区
+            }
+        }
+    ]
+}

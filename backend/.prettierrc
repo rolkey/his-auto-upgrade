@@ -1,0 +1,17 @@
+{
+    "trailingComma": "all",
+    "singleQuote": true,
+    "printWidth": 100,
+    "semi": true,
+    "endOfLine": "auto",
+    "tabWidth": 2,
+    "overrides": [
+        {
+            "files": "*.js",
+            "options": {
+                "tabWidth": 4,
+                "parser": "js"
+            }
+        }
+    ]
+}
